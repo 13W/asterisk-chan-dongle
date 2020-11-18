@@ -507,12 +507,13 @@ again:
 				if(count != 0) {
 					goto again;
 				}
-				ast_debug (1, "[%s] Deadlock avoided for write!\n", PVT_ID(pvt));
+				ast_debug (1, "[%s] [%d] Deadlock avoided for write %d/%d! %d: %d => %s\n", PVT_ID(pvt), count, iovcnt, iov->iov_len, fd, errno, strerror(errno));
 			}
 			break;
 		}
 		else
 		{
+			ast_debug (1, "[%s] [%d] Written %d bytes, total: %d, iovcnt: %d/%d\n", PVT_ID(pvt), count, written, done, iovcnt, iov->iov_len);
 			done += written;
 			count = 10;
 			do
@@ -535,7 +536,7 @@ again:
 
 	if (done != FRAME_SIZE)
 	{
-		ast_debug (1, "[%s] Write error!\n", PVT_ID(pvt));
+		ast_debug (1, "[%s] [%d] Write error! %d != %d\n", PVT_ID(pvt), count, done, FRAME_SIZE);
 	}
 }
 
@@ -599,14 +600,16 @@ static void timing_write(struct pvt* pvt)
 
 			iov[0].iov_base		= silence_frame;
 			iov[0].iov_len		= FRAME_SIZE;
-			iovcnt			= 1;
+			iovcnt			= 0;
 			// no need to change_audio_endianness_to_le for zeroes
 //			continue;
 		}
 
 //		iov_add(buffer, sizeof(buffer), iov);
-		if(msg)
-			ast_debug (7, msg, PVT_ID(pvt));
+		if(msg) {
+//			ast_debug (7, msg, PVT_ID(pvt));
+			ast_debug (7, "[%s] Used: %d, iovcnt: %d, msg = %s\n", PVT_ID(pvt), used, iovcnt, msg);
+		}
 
 //	}
 
@@ -1146,18 +1149,21 @@ EXPORT_DEF void change_channel_state(struct cpvt * cpvt, unsigned newstate, int 
 			{
 				case CALL_STATE_DIALING:
 					/* from ^ORIG:idx,y */
+					ast_debug (1, "[%s] New State: CALL_STATE_DIALING: %d\n", PVT_ID(pvt), call_idx);
 					activate_call(cpvt);
 					queue_control_channel (cpvt, AST_CONTROL_PROGRESS);
 					ast_setstate (channel, AST_STATE_DIALING);
 					break;
 
 				case CALL_STATE_ALERTING:
+					ast_debug (1, "[%s] New State: CALL_STATE_ALERTING: %d\n", PVT_ID(pvt), call_idx);
 					activate_call(cpvt);
 					queue_control_channel (cpvt, AST_CONTROL_RINGING);
 					ast_setstate (channel, AST_STATE_RINGING);
 					break;
 
 				case CALL_STATE_ACTIVE:
+					ast_debug (1, "[%s] New State: CALL_STATE_ACTIVE: %d\n", PVT_ID(pvt), call_idx);
 					activate_call(cpvt);
 					if (oldstate == CALL_STATE_ONHOLD)
 					{

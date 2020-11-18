@@ -229,8 +229,8 @@ EXPORT_DEF at_res_t at_read_result_classification (struct ringbuffer * rb, size_
 
 	rb_read_upd (rb, len);
 
-/*	ast_debug (5, "receive result '%s'\n", at_res2str (at_res));
-*/
+	ast_debug (5, "receive result '%s'\n", at_res2str (at_res));
+
 
 	return at_res;
 }

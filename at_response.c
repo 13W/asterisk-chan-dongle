@@ -28,8 +28,6 @@
 #include "smsdb.h"
 #include "error.h"
 
-#define DEF_STR(str)	str,STRLEN(str)
-
 #define CCWA_STATUS_NOT_ACTIVE	0
 #define CCWA_STATUS_ACTIVE	1
 
@@ -37,59 +35,17 @@
 #define CLCC_CALL_TYPE_DATA	1
 #define CLCC_CALL_TYPE_FAX	2
 
-/* magic!!! must be in same order as elements of enums in at_res_t */
 static const at_response_t at_responses_list[] = {
-	{ RES_PARSE_ERROR,"PARSE ERROR", 0, 0 },
-	{ RES_UNKNOWN,"UNKNOWN", 0, 0 },
 
-	{ RES_BOOT,"^BOOT",DEF_STR("^BOOT:") },
-	{ RES_BUSY,"BUSY",DEF_STR("BUSY\r") },
-	{ RES_CEND,"^CEND",DEF_STR("^CEND:") },
+	AT_RESPONSES_TABLE(AT_RES_AS_STRUCTLIST)
 
-	{ RES_CMGR, "+CMGR",DEF_STR("+CMGR:") },
-	{ RES_CMS_ERROR, "+CMS ERROR",DEF_STR("+CMS ERROR:") },
-	{ RES_CMTI, "+CMTI",DEF_STR("+CMTI:") },
-	{ RES_CDSI, "+CDSI",DEF_STR("+CDSI:") },
-	{ RES_CNUM, "+CNUM",DEF_STR("+CNUM:") },		/* and "ERROR+CNUM:" */
-
-	{ RES_CONF,"^CONF",DEF_STR("^CONF:") },
-	{ RES_CONN,"^CONN",DEF_STR("^CONN:") },
-	{ RES_COPS,"+COPS",DEF_STR("+COPS:") },
-	{ RES_CPIN,"+CPIN",DEF_STR("+CPIN:") },
-
-	{ RES_CREG,"+CREG",DEF_STR("+CREG:") },
-	{ RES_CSQ,"+CSQ",DEF_STR("+CSQ:") },
-	{ RES_CSSI,"+CSSI",DEF_STR("+CSSI:") },
-	{ RES_CSSU,"+CSSU",DEF_STR("+CSSU:") },
-
-	{ RES_CUSD,"+CUSD",DEF_STR("+CUSD:") },
-	{ RES_ERROR,"ERROR",DEF_STR("ERROR\r") },		/* and "COMMAND NOT SUPPORT\r" */
-	{ RES_MODE,"^MODE",DEF_STR("^MODE:") },
-	{ RES_NO_CARRIER,"NO CARRIER",DEF_STR("NO CARRIER\r") },
-
-	{ RES_NO_DIALTONE,"NO DIALTONE",DEF_STR("NO DIALTONE\r") },
-	{ RES_OK,"OK",DEF_STR("OK\r") },
-	{ RES_ORIG,"^ORIG",DEF_STR("^ORIG:") },
-	{ RES_RING,"RING",DEF_STR("RING\r") },
-
-	{ RES_RSSI,"^RSSI",DEF_STR("^RSSI:") },
-	{ RES_SMMEMFULL,"^SMMEMFULL",DEF_STR("^SMMEMFULL:") },
-	{ RES_SMS_PROMPT,"> ",DEF_STR("> ") },
-	{ RES_SRVST,"^SRVST",DEF_STR("^SRVST:") },
-
-	{ RES_CVOICE,"^CVOICE",DEF_STR("^CVOICE:") },
-	{ RES_CMGS,"+CMGS",DEF_STR("+CMGS:") },
-	{ RES_CPMS,"+CPMS",DEF_STR("+CPMS:") },
-	{ RES_CSCA,"+CSCA",DEF_STR("+CSCA:") },
-
-	{ RES_CLCC,"+CLCC", DEF_STR("+CLCC:") },
-	{ RES_CCWA,"+CCWA", DEF_STR("+CCWA:") },
-
-	/* duplicated response undef other id */
+	/* The hackish way to define the duplicated responses in the meantime */
+#define DEF_STR(str)	str,STRLEN(str)
 	{ RES_CNUM, "+CNUM",DEF_STR("ERROR+CNUM:") },
 	{ RES_ERROR,"ERROR",DEF_STR("COMMAND NOT SUPPORT\r") },
-	};
 #undef DEF_STR
+	};
+
 
 EXPORT_DEF const at_responses_t at_responses = { at_responses_list, 2, ITEMS_OF(at_responses_list), RES_MIN, RES_MAX};
 
@@ -166,7 +122,7 @@ static int at_response_ok (struct pvt* pvt, at_res_t res)
 				break;
 
 			case CMD_AT_CVOICE:
-				ast_debug (1, "[%s] Dongle has voice support\n", PVT_ID(pvt));
+				ast_log (LOG_NOTICE, "[%s] Dongle has voice support\n", PVT_ID(pvt));
 
 				pvt->has_voice = 1;
 				break;
@@ -230,7 +186,7 @@ static int at_response_ok (struct pvt* pvt, at_res_t res)
 				pvt->dialing = 0;
 				pvt->cwaiting = 0;
 				break;
-			case CMD_AT_DDSETEX:
+			case CMD_AT_CPCMREG:
 				ast_debug (1, "[%s] %s sent successfully\n", PVT_ID(pvt), at_cmd2str (ecmd->cmd));
 				if (!pvt->initialized)
 				{
@@ -468,8 +424,8 @@ static int at_response_error (struct pvt* pvt, at_res_t res)
 				queue_control_channel (task->cpvt, AST_CONTROL_CONGESTION);
 				break;
 
-			case CMD_AT_DDSETEX:
-				ast_log (LOG_ERROR, "[%s] AT^DDSETEX failed\n", PVT_ID(pvt));
+			case CMD_AT_CPCMREG:
+				ast_log (LOG_ERROR, "[%s] AT+CPCMREG failed\n", PVT_ID(pvt));
 				break;
 
 			case CMD_AT_CHUP:
@@ -651,8 +607,8 @@ static int at_response_orig (struct pvt* pvt, const char* str)
 
 	if (sscanf (str, "^ORIG:%d,%d", &call_index, &call_type) != 2)
 	{
-		ast_log (LOG_ERROR, "[%s] Error parsing ORIG event '%s'\n", PVT_ID(pvt), str);
-		return -1;
+               ast_log (LOG_ERROR, "[%s] Error parsing ORIG event '%s'\n", PVT_ID(pvt), str);
+               return -1;
 	}
 
 	ast_debug (1, "[%s] ORIG Received call_index: %d call_type %d\n", PVT_ID(pvt), call_index, call_type);
@@ -739,9 +695,9 @@ static int at_response_conf (struct pvt* pvt, const char* str)
  * \retval -1 error
  */
 
-static int at_response_cend (struct pvt * pvt, const char* str)
+static int at_response_cend (struct pvt * pvt, const char* str, int call_index)
 {
-	int call_index = 0;
+//	int call_index = 0;
 	int duration   = 0;
 	int end_status = 0;
 	int cc_cause   = 0;
@@ -756,7 +712,10 @@ static int at_response_cend (struct pvt * pvt, const char* str)
 
 	if (sscanf (str, "^CEND:%d,%d,%d,%d", &call_index, &duration, &end_status, &cc_cause) != 4)
 	{
-		ast_debug (1, "[%s] Could not parse all CEND parameters\n", PVT_ID(pvt));
+		if (sscanf (str, "VOICE CALL: END: %d", &duration) != 1)
+		{
+			ast_debug (1, "[%s] Could not parse all CEND parameters\n", PVT_ID(pvt));
+		}
 	}
 
 	ast_debug (1,	"[%s] CEND: call_index %d duration %d end_status %d cc_cause %d Line disconnected\n"
@@ -826,7 +785,7 @@ static int at_response_conn (struct pvt* pvt, const char* str)
 	 */
 	if (sscanf (str, "^CONN:%d,%d", &call_index, &call_type) != 2)
 	{
-		ast_log (LOG_ERROR, "[%s] Error parsing CONN event '%s'\n", PVT_ID(pvt), str);
+		ast_log (LOG_ERROR, "[%s] Error parsing ORIG event '%s'\n", PVT_ID(pvt), str);
 		return -1;
 	}
 
@@ -1810,6 +1769,8 @@ int at_response (struct pvt* pvt, const struct iovec iov[2], int iovcnt, at_res_
 	size_t		len;
 	const at_queue_task_t *task = at_queue_head_task(pvt);
 	const at_queue_cmd_t *ecmd = at_queue_task_cmd(task);
+	char buffer[20];
+	int duration = 0;
 
 
 	if(iov[0].iov_len + iov[1].iov_len > 0)
@@ -1845,6 +1806,29 @@ int at_response (struct pvt* pvt, const struct iovec iov[2], int iovcnt, at_res_
 			case RES_CVOICE:
 			case RES_CPMS:
 			case RES_CONF:
+				return 0;
+
+			case RES_VOICE_CALL_BEGIN:
+				if (at_enable_usb_audio(task->cpvt) != 0) {
+				    ast_debug (1, "[%s] Failed to send AT+CPCMREG command\n", PVT_ID(pvt));
+				    return -1;
+				}
+
+				sprintf(buffer, "^CONN:%d,0", task->cpvt->call_idx);
+				ast_log(LOG_NOTICE, "[%s] %s => %s\n", PVT_ID(pvt), str, buffer);
+				return at_response_conn (pvt, buffer);
+
+			case RES_VOICE_CALL_END:
+				ast_log(LOG_NOTICE, "[%s] %s\n", PVT_ID(pvt), str);
+				if (sscanf (str, "VOICE CALL: END: %d", &duration) != 1)
+				{
+				    ast_debug (1, "[%s] Could not parse all VOICE CALL: END: parameters\n", PVT_ID(pvt));
+				}
+				sprintf(buffer, "^CEND:%d,%d,0,0", task->cpvt->call_idx, duration);
+				return at_response_cend (pvt, buffer, task->cpvt->call_idx);
+
+			case RES_SMS_DONE:
+				ast_log(LOG_NOTICE, "[%s] SMS DONE\n", PVT_ID(pvt));
 				return 0;
 
 			case RES_CMGS:
@@ -1889,7 +1873,7 @@ int at_response (struct pvt* pvt, const struct iovec iov[2], int iovcnt, at_res_
 				return at_response_orig (pvt, str);
 
 			case RES_CEND:
-				return at_response_cend (pvt, str);
+				return at_response_cend (pvt, str, task->cpvt->call_idx);
 
 			case RES_CONN:
 				return at_response_conn (pvt, str);

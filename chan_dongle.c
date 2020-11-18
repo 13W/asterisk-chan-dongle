@@ -638,15 +638,22 @@ static void pvt_start(struct pvt * pvt)
 	pvt->data_fd = opentty(PVT_STATE(pvt, data_tty), &pvt->dlock);
 	if (pvt->data_fd < 0) {
 		return;
+	} else {
+		ast_verb(3, "[%s] Connected to  %s:%d...\n", PVT_ID(pvt), PVT_STATE(pvt, data_tty), pvt->data_fd);
 	}
 
+	ast_verb(3, "[%s] Trying to connect on %s...\n", PVT_ID(pvt), PVT_STATE(pvt, audio_tty));
 	// TODO: delay until device activate voice call or at pvt_on_create_1st_channel()
 	pvt->audio_fd = opentty(PVT_STATE(pvt, audio_tty), &pvt->alock);
 	if (pvt->audio_fd < 0) {
 		goto cleanup_datafd;
+	} else {
+		ast_verb(3, "[%s] Connected to  %s:%d...\n", PVT_ID(pvt), PVT_STATE(pvt, audio_tty), pvt->audio_fd);
 	}
 
+
 	if (!start_monitor(pvt)) {
+		ast_verb(3, "[%s] Monitor not started for %s...\n", PVT_ID(pvt), PVT_STATE(pvt, data_tty));
 		goto cleanup_audiofd;
 	}
 

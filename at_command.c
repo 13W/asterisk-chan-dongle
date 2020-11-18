@@ -33,7 +33,8 @@ static const char cmd_at[] 	 = "AT\r";
 static const char cmd_chld1x[]   = "AT+CHLD=1%d\r";
 static const char cmd_chld2[]    = "AT+CHLD=2\r";
 static const char cmd_clcc[]     = "AT+CLCC\r";
-static const char cmd_ddsetex2[] = "AT^DDSETEX=2\r";
+static const char cmd_cpcmreg[]  = "AT+CPCMREG=1\r";
+static const char cmd_csdsc[]    = "AT+CSDVC=3\r";
 
 /*!
  * \brief Format and fill generic command
@@ -128,7 +129,7 @@ EXPORT_DEF int at_enqueue_initialization(struct cpvt *cpvt, at_cmd_t from_comman
 	static const char cmd15[] = "AT+CREG?\r";
 	static const char cmd16[] = "AT+CNUM\r";
 
-	static const char cmd17[] = "AT^CVOICE?\r";
+	static const char cmd17[] = "AT\r";
 //	static const char cmd18[] = "AT+CLIP=0\r";
 	static const char cmd19[] = "AT+CSSN=1,1\r";
 	static const char cmd20[] = "AT+CMGF=0\r";
@@ -142,7 +143,7 @@ EXPORT_DEF int at_enqueue_initialization(struct cpvt *cpvt, at_cmd_t from_comman
 		ATQ_CMD_DECLARE_ST(CMD_AT, cmd_at),
 		ATQ_CMD_DECLARE_ST(CMD_AT_Z, cmd2),		/* optional,  reload configuration */
 		ATQ_CMD_DECLARE_ST(CMD_AT_E, cmd3),		/* disable echo */
-		ATQ_CMD_DECLARE_DYN(CMD_AT_U2DIAG),		/* optional, Enable or disable some devices */
+//		ATQ_CMD_DECLARE_DYN(CMD_AT_U2DIAG),		/* optional, Enable or disable some devices */
 		ATQ_CMD_DECLARE_ST(CMD_AT_CGMI, cmd5),		/* Getting manufacturer info */
 
 		ATQ_CMD_DECLARE_ST(CMD_AT_CGMM, cmd7),		/* Get Product name */
@@ -538,7 +539,7 @@ EXPORT_DEF int at_enqueue_dial(struct cpvt *cpvt, const char *number, int clir)
 	ATQ_CMD_INIT_ST(cmds[cmdsno], CMD_AT_CLCC, cmd_clcc);
 	cmdsno++;
 
-	ATQ_CMD_INIT_ST(cmds[cmdsno], CMD_AT_DDSETEX, cmd_ddsetex2);
+	ATQ_CMD_INIT_ST(cmds[cmdsno], CMD_AT_CPCMREG, cmd_cpcmreg);
 	cmdsno++;
 
 
@@ -551,6 +552,28 @@ EXPORT_DEF int at_enqueue_dial(struct cpvt *cpvt, const char *number, int clir)
 	return 0;
 }
 
+EXPORT_DEF int at_enable_usb_audio(struct cpvt *cpvt)
+{
+	int err;
+	at_queue_cmd_t cmds[] = {
+		ATQ_CMD_DECLARE_DYN(CMD_AT_CPCMREG)
+	};
+	unsigned cmdsno = ITEMS_OF(cmds);
+
+	err = at_fill_generic_cmd (&cmds[0], "AT+CPCMREG=1\r");
+	if (err) {
+		chan_dongle_err = E_UNKNOWN;
+		return err;
+	}
+
+	if (at_queue_insert(cpvt, cmds, cmdsno, 0) != 0) {
+		chan_dongle_err = E_QUEUE;
+		return -1;
+	}
+
+	return 0;
+}
+
 /*!
  * \brief Enqueue a answer commands
  * \param cpvt -- cpvt structure
@@ -560,8 +583,8 @@ EXPORT_DEF int at_enqueue_answer(struct cpvt *cpvt)
 {
 	at_queue_cmd_t cmds[] = {
 		ATQ_CMD_DECLARE_DYN(CMD_AT_A),
-		ATQ_CMD_DECLARE_ST(CMD_AT_DDSETEX, cmd_ddsetex2),
-		};\
+//		ATQ_CMD_DECLARE_ST(CMD_AT_CPCMREG, cmd_cpcmreg),
+	};
 	int count = ITEMS_OF(cmds);
 	const char * cmd1;
 
@@ -574,7 +597,7 @@ EXPORT_DEF int at_enqueue_answer(struct cpvt *cpvt)
 	{
 		cmds[0].cmd = CMD_AT_CHLD_2x;
 		cmd1 = "AT+CHLD=2%d\r";
-/* no need CMD_AT_DDSETEX in this case? */
+/* no need CMD_AT_CPCMREG in this case? */
 		count--;
 	}
 	else
@@ -587,6 +610,7 @@ EXPORT_DEF int at_enqueue_answer(struct cpvt *cpvt)
 		chan_dongle_err = E_UNKNOWN;
 		return -1;
 	}
+
 	if (at_queue_insert(cpvt, cmds, count, 1) != 0) {
 		chan_dongle_err = E_QUEUE;
 		return -1;
@@ -720,6 +744,11 @@ EXPORT_DEF void at_retrieve_next_sms(struct cpvt *cpvt)
  */
 EXPORT_DEF int at_enqueue_retrieve_sms(struct cpvt *cpvt, int index)
 {
+
+	if (index > 10) {
+		return 0;
+	}
+
 	pvt_t *pvt = cpvt->pvt;
 	int err;
 	at_queue_cmd_t cmds[] = {
